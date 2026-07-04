@@ -10,6 +10,8 @@ import { defaultSkill, updateLoginStreak } from './math/adaptiveEngine.js';
 const subjects = ['addition', 'subtraction', 'multiplication', 'fractions', 'decimals'];
 
 const defaultProfile = {
+  playerName: 'Reacher',
+  monkeStyle: 'purple-408',
   level: 1,
   xp: 0,
   shinyRocks: 120,
@@ -26,11 +28,17 @@ const defaultProfile = {
   equippedCosmetic: null,
   daily: {},
   activityLog: [],
-  skills: Object.fromEntries(subjects.map((s) => [s, defaultSkill()]))
+  settings: {
+    readQuestions: false,
+    readHints: false,
+    monkeEncouragement: false
+  },
+  skills: Object.fromEntries(subjects.map((subject) => [subject, defaultSkill()]))
 };
 
 function mergeProfile(saved) {
   const merged = { ...defaultProfile, ...(saved || {}) };
+  merged.settings = { ...defaultProfile.settings, ...(saved?.settings || {}) };
   merged.skills = { ...defaultProfile.skills, ...(saved?.skills || {}) };
   subjects.forEach((subject) => {
     merged.skills[subject] = { ...defaultSkill(), ...(merged.skills[subject] || {}) };
@@ -48,8 +56,9 @@ function loadProfile() {
 
 export default function App() {
   const [profile, setProfile] = useState(() => updateLoginStreak(loadProfile()));
-  const [shopMessage, setShopMessage] = useState('Spend Shiny Rocks on cosmetics. Bananas restore energy.');
+  const [shopMessage, setShopMessage] = useState('Spend Shiny Rocks on cosmetics. Equipped items should appear immediately.');
   const [dailyMessage, setDailyMessage] = useState('Keep your daily streak alive with one practice round.');
+  const [actionMessage, setActionMessage] = useState('');
 
   useEffect(() => {
     localStorage.setItem('tmsreacher-profile', JSON.stringify(profile));
@@ -57,18 +66,19 @@ export default function App() {
 
   useEffect(() => {
     const streak = profile.dailyLoginStreak || 1;
-    setDailyMessage(`Daily streak: ${streak} day${streak === 1 ? '' : 's'}. Login reward added: Shiny Rocks!`);
+    setDailyMessage(`Daily streak: ${streak} day${streak === 1 ? '' : 's'}. Today’s login reward is in the Shiny Rock pile.`);
   }, []);
 
   function resetProgress() {
     setProfile(updateLoginStreak(defaultProfile));
-    setShopMessage('Fresh save started. Monke is back at the treehouse.');
+    setShopMessage('Fresh save started. Monke and Purple are back at the treehouse.');
+    setActionMessage('Local progress reset.');
   }
 
   function buyItem(item) {
     if (profile.ownedCosmetics.includes(item.id)) {
       setProfile({ ...profile, equippedCosmetic: item.id });
-      setShopMessage(`${item.name} equipped.`);
+      setShopMessage(`${item.name} equipped. Look at Monke or Purple in the Waterfall Treehouse.`);
       return;
     }
     if (profile.shinyRocks < item.cost) {
@@ -81,32 +91,52 @@ export default function App() {
       ownedCosmetics: [...profile.ownedCosmetics, item.id],
       equippedCosmetic: item.id
     });
-    setShopMessage(`${item.name} unlocked and equipped!`);
+    setShopMessage(`${item.name} unlocked and equipped. The change is live in the treehouse.`);
   }
 
   function useBanana() {
     if (profile.bananas <= 0) {
-      setShopMessage('No bananas yet. Earn bananas by answering correctly in practice.');
+      const message = 'No bananas yet. Earn them through practice challenges.';
+      setShopMessage(message);
+      setActionMessage(message);
       return;
     }
-    setProfile({ ...profile, bananas: profile.bananas - 1, energy: Math.min(100, profile.energy + 20) });
-    setShopMessage('Banana snack used. +20 energy.');
+    if (profile.energy >= 100) {
+      const message = 'Energy is already full, so Purple saved the banana for later.';
+      setShopMessage(message);
+      setActionMessage(message);
+      return;
+    }
+    const before = profile.energy;
+    const after = Math.min(100, before + 20);
+    setProfile({ ...profile, bananas: profile.bananas - 1, energy: after });
+    const message = `Banana snack used: energy ${before}% → ${after}%.`;
+    setShopMessage(message);
+    setActionMessage(message);
   }
 
   return (
     <main className="app-shell">
+      <div className="ambient-world" aria-hidden="true">
+        <span className="ambient-mist mist-one" />
+        <span className="ambient-mist mist-two" />
+        <span className="ambient-fall fall-one" />
+        <span className="ambient-fall fall-two" />
+        <span className="ambient-leaf leaf-one" />
+        <span className="ambient-leaf leaf-two" />
+      </div>
       <nav className="top-nav">
-        <a className="brand-mark" href="https://youtube.com/@tmsreacher" target="_blank" rel="noreferrer" aria-label="Open TMS REACHER on YouTube">▶ TMS REACHER</a>
+        <a className="brand-mark" href="#treehouse">TMS REACHER</a>
         <div className="nav-stats"><span>🔥 {profile.dailyLoginStreak || 1}</span><span>🪨 {profile.shinyRocks}</span><span>🍌 {profile.bananas}</span><span>⚡ {profile.energy}%</span><span>⭐ L{profile.level}</span></div>
       </nav>
-      <Hero profile={profile} useBanana={useBanana} dailyMessage={dailyMessage} />
+      <Hero profile={profile} useBanana={useBanana} dailyMessage={dailyMessage} actionMessage={actionMessage} />
       <PracticeArena profile={profile} setProfile={setProfile} />
       <Flashcards profile={profile} setProfile={setProfile} />
       <WorldMap profile={profile} cosmetics={cosmetics} buyItem={buyItem} shopMessage={shopMessage} useBanana={useBanana} />
       <Dashboard profile={profile} />
       <section className="panel footer-panel">
-        <h2>Next Builds</h2>
-        <p>Cloud accounts, family profiles, real YouTube video feed, animated boss battles, and longer weekly missions.</p>
+        <h2>Season 1 Foundation</h2>
+        <p>Next: 12-minute guided expeditions, Monke levels and abilities, parent-owned cloud accounts, family challenges, optional tap-to-hear voice, and invite-only friends.</p>
         <button className="ghost-btn" onClick={resetProgress}>Reset local progress</button>
       </section>
     </main>
