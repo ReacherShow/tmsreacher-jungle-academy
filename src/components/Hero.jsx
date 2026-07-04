@@ -7,8 +7,9 @@ const dogTricks = ['walk', 'jump', 'spin', 'wave'];
 export default function Hero({ profile, useBanana, dailyMessage, actionMessage }) {
   const [trickIndex, setTrickIndex] = useState(0);
   const trick = dogTricks[trickIndex];
-  const crown = profile.equippedCosmetic === 'crown';
-  const crystalPack = profile.equippedCosmetic === 'crystal-pack';
+  const crown = profile.equippedCosmetics?.monkeHead === 'crown';
+  const crystalPack = profile.equippedCosmetics?.monkeBack === 'crystal-pack';
+  const equippedBandana = profile.equippedCosmetics?.dogNeck || (profile.equippedCosmetic?.startsWith('dog-bandana') ? profile.equippedCosmetic : null);
   const bananaDisabled = profile.bananas <= 0 || profile.energy >= 100;
 
   function nextTrick() {
@@ -54,7 +55,7 @@ export default function Hero({ profile, useBanana, dailyMessage, actionMessage }
             <span className="monke-emoji">🦍</span>
             {crystalPack && <span className="monke-pack">💎</span>}
           </div>
-          <PurpleDog equippedCosmetic={profile.equippedCosmetic} trick={trick} />
+          <PurpleDog equippedBandana={equippedBandana} trick={trick} />
 
           <a className="world-sign sign-practice" href="#practice">Practice Arena</a>
           <a className="world-sign sign-flashcards" href="#flashcards">Flash Card Grove</a>

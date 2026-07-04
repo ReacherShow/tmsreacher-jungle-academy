@@ -1,8 +1,15 @@
-export default function PurpleDog({ equippedCosmetic, trick = 'walk' }) {
-  const hasBandana = equippedCosmetic === 'dog-bandana';
+const BANDANA_STYLES = {
+  'dog-bandana': 'leaf',
+  'dog-bandana-waterfall': 'waterfall',
+  'dog-bandana-crystal': 'crystal',
+  'dog-bandana-legend': 'legend'
+};
+
+export default function PurpleDog({ equippedBandana, trick = 'walk', preview = false }) {
+  const bandanaStyle = BANDANA_STYLES[equippedBandana] || null;
 
   return (
-    <div className={`purple-pup pup-${trick}`} aria-label={`Purple the dog ${hasBandana ? 'wearing a bandana' : ''}`}>
+    <div className={`purple-pup pup-${trick} ${preview ? 'pup-preview' : ''}`} aria-label={`Purple the dog ${bandanaStyle ? `wearing the ${bandanaStyle} bandana` : ''}`}>
       <div className="pup-shadow" />
       <div className="pup-tail"><span /></div>
       <div className="pup-body">
@@ -10,7 +17,7 @@ export default function PurpleDog({ equippedCosmetic, trick = 'walk' }) {
         <div className="pup-leg pup-leg-front"><i /></div>
       </div>
       <div className="pup-neck">
-        {hasBandana && <div className="pup-bandana"><i /></div>}
+        {bandanaStyle && <div className={`pup-bandana bandana-${bandanaStyle}`}><i /><b /></div>}
       </div>
       <div className="pup-head">
         <div className="pup-ear pup-ear-left" />
@@ -22,7 +29,7 @@ export default function PurpleDog({ equippedCosmetic, trick = 'walk' }) {
         </div>
         <div className="pup-wave-paw" />
       </div>
-      <span className="pup-name">Purple</span>
+      {!preview && <span className="pup-name">Purple</span>}
     </div>
   );
 }

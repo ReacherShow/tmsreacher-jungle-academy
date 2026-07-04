@@ -28,12 +28,17 @@ export default function WorldMap({ profile, cosmetics, buyItem, shopMessage, use
         <div className="shop-list">
           {cosmetics.map((item) => {
             const owned = profile.ownedCosmetics.includes(item.id);
-            const equipped = profile.equippedCosmetic === item.id;
+            const equipped = profile.equippedCosmetics?.[item.slot] === item.id || profile.equippedCosmetic === item.id;
             return (
-              <article className="shop-card" key={item.name}>
-                <span>{item.emoji}</span>
-                <strong>{item.name}</strong>
-                <small>{item.description}</small>
+              <article className={`shop-card ${item.type === 'bandana' ? 'bandana-shop-card' : ''}`} key={item.name}>
+                {item.type === 'bandana' ? (
+                  <div className={`bandana-preview bandana-${item.bandanaStyle}`} aria-label={`${item.name} preview`}><i /><b /></div>
+                ) : <span>{item.emoji}</span>}
+                <div className="shop-card-copy">
+                  {item.tier && <em>{item.tier}</em>}
+                  <strong>{item.name}</strong>
+                  <small>{item.description}</small>
+                </div>
                 <button className="mini-btn" onClick={() => buyItem(item)}>
                   {equipped ? 'Equipped' : owned ? 'Equip' : `Buy ${item.cost} 🪨`}
                 </button>
