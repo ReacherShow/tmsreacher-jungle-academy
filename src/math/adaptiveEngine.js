@@ -213,12 +213,16 @@ export function updateProfile(profile, problem, wasCorrect, mode = 'practice') {
   const totalCorrect = (profile.correct || 0) + (wasCorrect ? 1 : 0);
   const total = (profile.total || 0) + 1;
   const nextXp = (profile.xp || 0) + xpGain;
+  const rawLevel = Math.floor(nextXp / 175) + 1;
+  const cappedLevel = Math.min(20, rawLevel);
+  const legendStars = rawLevel > 20 ? Math.floor((nextXp - 19 * 175) / 350) : (profile.legendStars || 0);
 
   return {
     ...profile,
     skills,
     xp: nextXp,
-    level: Math.floor(nextXp / 175) + 1,
+    level: cappedLevel,
+    legendStars,
     shinyRocks: (profile.shinyRocks || 0) + rocksGain,
     bananas: (profile.bananas || 0) + bananasGain,
     energy: Math.max(0, Math.min(100, (profile.energy || 100) + (wasCorrect ? 2 : -3))),
