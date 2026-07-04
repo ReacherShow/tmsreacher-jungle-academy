@@ -31,3 +31,13 @@ Build command: `npm run build`
 Publish directory: `dist`
 
 Do not commit `node_modules`, `dist`, or `package-lock.json` from a generated environment.
+
+## v1.4 foundation changes
+
+- Living Waterfall Treehouse background and world navigation signs.
+- Full-body Purple dog with floppy ears, walking, jumping, spinning, waving, and a visible equipped bandana.
+- Clear flashcard success/review feedback before the next card appears.
+- Local-device date keys and written date labels.
+- Banana snacks no longer disappear when energy is already full.
+- Parent gate added before opening the external TMS REACHER YouTube channel.
+- Child privacy and security engineering plan in `docs/SECURITY-PRIVACY-PLAN.md`.
