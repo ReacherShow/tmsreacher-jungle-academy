@@ -1,27 +1,42 @@
 const OPS = ['addition', 'subtraction', 'multiplication', 'fractions', 'decimals'];
+const REVIEW_INTERVALS = [0, 1, 3, 7, 14, 30];
 
 export function createProblem(profile, subject = 'multiplication', forceReview = false) {
   const skill = profile.skills?.[subject] || defaultSkill();
-  if ((forceReview || Math.random() < 0.35) && skill.reviewQueue?.length) {
-    return fromReview(skill.reviewQueue[Math.floor(Math.random() * skill.reviewQueue.length)], subject);
+  const dueReviews = getDueReviewKeys(skill);
+  const reviewPool = dueReviews.length ? dueReviews : (skill.reviewQueue || []);
+
+  if ((forceReview || Math.random() < 0.35) && reviewPool.length) {
+    return fromReview(choice(reviewPool), subject);
   }
+
   switch (subject) {
     case 'addition': return makeAddition(skill.level);
     case 'subtraction': return makeSubtraction(skill.level);
     case 'fractions': return makeFraction(skill.level);
     case 'decimals': return makeDecimal(skill.level);
-    default: return makeMultiplication(skill, profile);
+    default: return makeMultiplication(skill);
   }
 }
 
 export function defaultSkill() {
-  return { level: 1, correct: 0, total: 0, streak: 0, mastery: {}, misses: {}, reviewQueue: [], lastFive: [] };
+  return {
+    level: 1,
+    correct: 0,
+    total: 0,
+    streak: 0,
+    mastery: {},
+    misses: {},
+    reviewQueue: [],
+    reviewSchedule: {},
+    lastFive: []
+  };
 }
 
 function rand(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
 function choice(list) { return list[Math.floor(Math.random() * list.length)]; }
 
-function makeMultiplication(skill, profile) {
+function makeMultiplication(skill) {
   const cap = getSubjectRange('multiplication', skill).max;
   const facts = [];
   for (let a = 2; a <= cap; a++) {
@@ -64,8 +79,9 @@ function makeDecimal(level) {
   const places = level <= 1 ? 10 : 100;
   const a = rand(1, level <= 1 ? 90 : 900) / places;
   const b = rand(1, level <= 1 ? 90 : 900) / places;
-  const answer = Number((a + b).toFixed(level <= 1 ? 1 : 2));
-  return { subject: 'decimals', display: `${a.toFixed(level <= 1 ? 1 : 2)} + ${b.toFixed(level <= 1 ? 1 : 2)}`, answer, key: `${a}+${b}`, parts: { a, b, places }, type: 'decimal' };
+  const digits = level <= 1 ? 1 : 2;
+  const answer = Number((a + b).toFixed(digits));
+  return { subject: 'decimals', display: `${a.toFixed(digits)} + ${b.toFixed(digits)}`, answer, key: `${a}+${b}`, parts: { a, b, places }, type: 'decimal' };
 }
 
 function fromReview(key, subject) {
@@ -80,6 +96,18 @@ function fromReview(key, subject) {
   if (subject === 'subtraction' && key.includes('-')) {
     const [a, b] = key.split('-').map(Number);
     return { subject, display: `${a} − ${b}`, answer: a - b, key, parts: { a, b }, type: 'whole' };
+  }
+  if (subject === 'fractions' && key.includes('/')) {
+    const match = key.match(/(\d+)\/(\d+)\+(\d+)\/(\d+)/);
+    if (match) {
+      const [, n1, den, n2] = match.map(Number);
+      return { subject, display: `${n1}/${den} + ${n2}/${den}`, answer: `${n1 + n2}/${den}`, key, parts: { n1, n2, den }, type: 'fraction' };
+    }
+  }
+  if (subject === 'decimals' && key.includes('+')) {
+    const [a, b] = key.split('+').map(Number);
+    const answer = Number((a + b).toFixed(2));
+    return { subject, display: `${a} + ${b}`, answer, key, parts: { a, b, places: 100 }, type: 'decimal' };
   }
   return createProblem({ skills: { [subject]: { ...defaultSkill(), reviewQueue: [] } } }, subject, false);
 }
@@ -110,9 +138,24 @@ export function updateProfile(profile, problem, wasCorrect, mode = 'practice') {
   let level = oldSkill.level;
   if (oldSkill.total >= 5 && recentAcc >= 0.8 && level < 5) level += 1;
   if (lastFive.length >= 4 && recentAcc <= 0.4 && level > 1) level -= 1;
+
   const reviewQueue = wasCorrect
     ? (oldSkill.reviewQueue || []).filter((fact) => fact !== problem.key || nextMastery < 4)
     : [...new Set([problem.key, ...(oldSkill.reviewQueue || [])])].slice(0, 18);
+
+  const previousReview = oldSkill.reviewSchedule?.[problem.key] || { stage: 0, due: today };
+  const nextStage = wasCorrect ? Math.min(REVIEW_INTERVALS.length - 1, (previousReview.stage || 0) + 1) : 0;
+  const due = wasCorrect ? dateOffsetKey(REVIEW_INTERVALS[nextStage]) : today;
+  const reviewSchedule = {
+    ...(oldSkill.reviewSchedule || {}),
+    [problem.key]: {
+      stage: nextStage,
+      due,
+      lastResult: wasCorrect ? 'correct' : 'review',
+      lastSeen: new Date().toISOString()
+    }
+  };
+
   skills[problem.subject] = {
     ...oldSkill,
     level,
@@ -122,14 +165,17 @@ export function updateProfile(profile, problem, wasCorrect, mode = 'practice') {
     mastery: { ...oldSkill.mastery, [problem.key]: nextMastery },
     misses: { ...oldSkill.misses, [problem.key]: wasCorrect ? Math.max(0, missCount - 1) : missCount + 1 },
     reviewQueue,
+    reviewSchedule,
     lastFive
   };
 
   const daily = { ...(profile.daily || {}) };
   const day = { correct: 0, total: 0, xp: 0, rocks: 0, bananas: 0, subjects: {}, ...(daily[today] || {}) };
-  const xpGain = wasCorrect ? (mode === 'flashcards' ? 8 : 15) : 4;
-  const rocksGain = wasCorrect ? (mode === 'flashcards' ? 4 : 8) : 1;
-  const bananasGain = wasCorrect && mode !== 'flashcards' ? 1 : 0;
+  const guidedRetry = mode === 'guided-retry';
+  const flashcards = mode === 'flashcards';
+  const xpGain = wasCorrect ? (guidedRetry ? 6 : flashcards ? 8 : 15) : 4;
+  const rocksGain = wasCorrect ? (guidedRetry ? 2 : flashcards ? 4 : 8) : 1;
+  const bananasGain = wasCorrect && !flashcards && !guidedRetry ? 1 : 0;
   day.correct += wasCorrect ? 1 : 0;
   day.total += 1;
   day.xp += xpGain;
@@ -138,7 +184,14 @@ export function updateProfile(profile, problem, wasCorrect, mode = 'practice') {
   day.subjects[problem.subject] = (day.subjects[problem.subject] || 0) + 1;
   daily[today] = day;
 
-  const activityLog = [...(profile.activityLog || []), { date: new Date().toISOString(), subject: problem.subject, key: problem.key, correct: wasCorrect, mode }].slice(-1000);
+  const activityLog = [...(profile.activityLog || []), {
+    date: new Date().toISOString(),
+    localDate: today,
+    subject: problem.subject,
+    key: problem.key,
+    correct: wasCorrect,
+    mode
+  }].slice(-1000);
   const totalCorrect = (profile.correct || 0) + (wasCorrect ? 1 : 0);
   const total = (profile.total || 0) + 1;
   const nextXp = (profile.xp || 0) + xpGain;
@@ -158,6 +211,12 @@ export function updateProfile(profile, problem, wasCorrect, mode = 'practice') {
     activityLog,
     weakFacts: summarizeWeakFacts(skills).slice(0, 10)
   };
+}
+
+export function recordStrategyPreference(profile, strategyId) {
+  const strategyPreferences = { ...(profile.strategyPreferences || {}) };
+  strategyPreferences[strategyId] = (strategyPreferences[strategyId] || 0) + 1;
+  return { ...profile, strategyPreferences };
 }
 
 export function updateLoginStreak(profile) {
@@ -180,75 +239,161 @@ export function getSubjectRange(subject, skill = defaultSkill()) {
 }
 
 export function getHint(problem) {
-  const subject = problem.subject;
-  if (subject === 'multiplication') return multiplicationHint(problem);
-  if (subject === 'addition') return additionHint(problem);
-  if (subject === 'subtraction') return subtractionHint(problem);
-  if (subject === 'fractions') return fractionHint(problem);
-  return decimalHint(problem);
+  return getLearningStrategies(problem)[0];
 }
 
-function multiplicationHint(problem) {
-  const { a, b } = problem.parts;
-  const smaller = Math.min(a, b), larger = Math.max(a, b), answer = problem.answer;
-  let tip = `Think of ${a} × ${b} as ${a} groups of ${b}. Skip-count by ${b}: ${Array.from({ length: Math.min(a, 8) }, (_, i) => b * (i + 1)).join(', ')}${a > 8 ? '...' : ''}`;
-  if (smaller === 9) tip = `9s trick: ${larger} × 10 = ${larger * 10}, then subtract ${larger}. ${larger * 10} − ${larger} = ${answer}.`;
-  else if (smaller === 8) tip = `Double three times: ${larger} → ${larger * 2} → ${larger * 4} → ${answer}.`;
-  else if (smaller === 6) tip = `Use 5s plus one more group: ${larger} × 5 = ${larger * 5}, plus ${larger} = ${answer}.`;
-  else if (smaller === 4) tip = `Double twice: ${larger} doubled is ${larger * 2}; doubled again is ${answer}.`;
-  return { tip, model: 'groups', groups: Array.from({ length: a }, (_, i) => ({ id: i, count: b })) };
+export function getLearningStrategies(problem) {
+  if (problem.subject === 'multiplication') return multiplicationStrategies(problem);
+  if (problem.subject === 'addition') return additionStrategies(problem);
+  if (problem.subject === 'subtraction') return subtractionStrategies(problem);
+  if (problem.subject === 'fractions') return fractionStrategies(problem);
+  return decimalStrategies(problem);
 }
-function additionHint(problem) {
+
+function multiplicationStrategies(problem) {
+  const { a, b } = problem.parts;
+  const smaller = Math.min(a, b);
+  const larger = Math.max(a, b);
+  const answer = problem.answer;
+  let mentalTip = `Think of ${a} × ${b} as ${a} equal groups of ${b}.`;
+  if (smaller === 9) mentalTip = `Use 10 groups, then remove one: ${larger} × 10 = ${larger * 10}; ${larger * 10} − ${larger} = ${answer}.`;
+  else if (smaller === 8) mentalTip = `Double three times: ${larger} → ${larger * 2} → ${larger * 4} → ${answer}.`;
+  else if (smaller === 6) mentalTip = `Use 5 groups plus one more: ${larger * 5} + ${larger} = ${answer}.`;
+  else if (smaller === 4) mentalTip = `Double twice: ${larger} → ${larger * 2} → ${answer}.`;
+
+  const split = b > 5 ? 5 : Math.max(1, b - 1);
+  const remainder = b - split;
+  const sequence = Array.from({ length: a }, (_, i) => b * (i + 1));
+
+  return [
+    {
+      id: 'picture-groups',
+      label: 'See groups',
+      tip: `${a} rows with ${b} in each row make ${answer} altogether.`,
+      model: 'groups',
+      groups: Array.from({ length: a }, (_, i) => ({ id: i, count: b }))
+    },
+    {
+      id: 'break-apart',
+      label: 'Break it apart',
+      tip: remainder > 0
+        ? `${a} × ${b} = (${a} × ${split}) + (${a} × ${remainder}) = ${a * split} + ${a * remainder} = ${answer}.`
+        : mentalTip,
+      model: 'equation',
+      equation: remainder > 0 ? [`${a} × ${b}`, `${a} × ${split} + ${a} × ${remainder}`, `${a * split} + ${a * remainder}`, `${answer}`] : [`${a} × ${b}`, `${answer}`]
+    },
+    {
+      id: 'skip-count',
+      label: 'Skip count',
+      tip: `Count by ${b} exactly ${a} times. The last landing spot is ${answer}.`,
+      model: 'skip-count',
+      sequence
+    },
+    {
+      id: 'mental-shortcut',
+      label: 'Mental shortcut',
+      tip: mentalTip,
+      model: 'equation',
+      equation: [`${a} × ${b}`, `${answer}`]
+    }
+  ];
+}
+
+function additionStrategies(problem) {
   const { a, b } = problem.parts;
   const makeTen = Math.ceil(a / 10) * 10;
   const need = makeTen - a;
-  const tip = need > 0 && need < b ? `Bridge to ten: ${a} needs ${need} to reach ${makeTen}. Split ${b} into ${need} and ${b - need}. Then ${makeTen} + ${b - need} = ${problem.answer}.` : `Break apart place values: add tens first, then ones. ${a} + ${b} = ${problem.answer}.`;
-  return { tip, model: 'bar', bars: [a, b] };
+  return [
+    {
+      id: 'bridge-ten',
+      label: 'Bridge to ten',
+      tip: need > 0 && need < b
+        ? `${a} needs ${need} to reach ${makeTen}. Split ${b} into ${need} and ${b - need}. Then ${makeTen} + ${b - need} = ${problem.answer}.`
+        : `Add the tens, then add the ones.`,
+      model: 'bar',
+      bars: [a, b]
+    },
+    {
+      id: 'place-value',
+      label: 'Place value',
+      tip: `Break both numbers into tens and ones, combine matching places, then put them back together.`,
+      model: 'equation',
+      equation: [`${a} + ${b}`, `${problem.answer}`]
+    }
+  ];
 }
-function subtractionHint(problem) {
+
+function subtractionStrategies(problem) {
   const { a, b } = problem.parts;
-  return { tip: `Count up from ${b} to ${a}. The distance between them is the answer: ${problem.answer}.`, model: 'numberline', start: b, end: a };
+  return [
+    { id: 'count-up', label: 'Count up', tip: `Start at ${b} and count up to ${a}. The distance is ${problem.answer}.`, model: 'numberline', start: b, end: a },
+    { id: 'subtract-parts', label: 'Break it apart', tip: `Subtract the tens first, then the ones. Check by adding ${b} back to your answer.`, model: 'equation', equation: [`${a} − ${b}`, `${problem.answer}`, `${problem.answer} + ${b} = ${a}`] }
+  ];
 }
-function fractionHint(problem) {
+
+function fractionStrategies(problem) {
   const { n1, n2, den } = problem.parts;
-  return { tip: `Same denominator means same-size pieces. Add the top numbers: ${n1} + ${n2} = ${n1 + n2}. Keep the bottom number ${den}.`, model: 'fractions', parts: [n1, n2], den };
+  return [
+    { id: 'fraction-picture', label: 'See the pieces', tip: `The pieces are the same size because the denominator stays ${den}. Combine ${n1} pieces and ${n2} pieces.`, model: 'fractions', parts: [n1, n2], den },
+    { id: 'fraction-rule', label: 'Use the structure', tip: `Add the top numbers: ${n1} + ${n2} = ${n1 + n2}. Keep the bottom number ${den}.`, model: 'equation', equation: [`${n1}/${den} + ${n2}/${den}`, `${n1 + n2}/${den}`] }
+  ];
 }
-function decimalHint(problem) {
+
+function decimalStrategies(problem) {
   const { a, b } = problem.parts;
-  return { tip: `Line up the decimal points, then add like whole numbers. ${a} + ${b} = ${problem.answer}.`, model: 'decimal', bars: [a, b] };
+  return [
+    { id: 'decimal-grid', label: 'See tenths', tip: `Line up the decimal points so tenths stay with tenths and ones stay with ones.`, model: 'decimal', bars: [a, b] },
+    { id: 'decimal-money', label: 'Think money', tip: `Imagine ${a} and ${b} as dollars. Combine the whole dollars and decimal parts separately.`, model: 'equation', equation: [`${a} + ${b}`, `${problem.answer}`] }
+  ];
 }
 
 export function needsReview(profile, subject) {
-  if (subject) return ((profile.skills?.[subject]?.reviewQueue) || []).length >= 3;
-  return OPS.some((op) => ((profile.skills?.[op]?.reviewQueue) || []).length >= 3);
+  if (subject) return getDueReviewKeys(profile.skills?.[subject] || defaultSkill()).length > 0 || ((profile.skills?.[subject]?.reviewQueue) || []).length >= 3;
+  return OPS.some((op) => needsReview(profile, op));
 }
+
+export function getDueReviewKeys(skill = defaultSkill()) {
+  const today = todayKey();
+  return Object.entries(skill.reviewSchedule || {})
+    .filter(([, item]) => item?.due && item.due <= today)
+    .sort((a, b) => String(a[1].due).localeCompare(String(b[1].due)))
+    .map(([key]) => key);
+}
+
 export function accuracy(profileOrSkill) {
   const total = profileOrSkill.total || 0;
   if (!total) return 0;
   return Math.round(((profileOrSkill.correct || 0) / total) * 100);
 }
+
 export function subjectAccuracy(profile, subject) { return accuracy(profile.skills?.[subject] || defaultSkill()); }
+
 export function localDateKey(date = new Date()) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 }
+
 export function todayKey() { return localDateKey(new Date()); }
+
 function dateOffsetKey(offset) {
   const date = new Date();
   date.setHours(12, 0, 0, 0);
   date.setDate(date.getDate() + offset);
   return localDateKey(date);
 }
+
 export function formatDateLabel(key, includeYear = false) {
   const [year, month, day] = key.split('-').map(Number);
   const date = new Date(year, month - 1, day, 12);
   return new Intl.DateTimeFormat(undefined, { month: 'long', day: 'numeric', ...(includeYear ? { year: 'numeric' } : {}) }).format(date);
 }
+
 export function summarizeWeakFacts(skills) {
   return Object.entries(skills || {}).flatMap(([subject, skill]) => Object.entries(skill.misses || {}).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([key]) => `${subject}: ${key}`));
 }
+
 export function getHistory(profile, days = 7) {
   return Array.from({ length: days }, (_, idx) => {
     const offset = idx - days + 1;
