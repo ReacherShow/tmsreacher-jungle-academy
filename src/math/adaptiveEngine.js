@@ -228,8 +228,24 @@ export function accuracy(profileOrSkill) {
   return Math.round(((profileOrSkill.correct || 0) / total) * 100);
 }
 export function subjectAccuracy(profile, subject) { return accuracy(profile.skills?.[subject] || defaultSkill()); }
-export function todayKey() { return new Date().toISOString().slice(0, 10); }
-function dateOffsetKey(offset) { const d = new Date(); d.setDate(d.getDate() + offset); return d.toISOString().slice(0, 10); }
+export function localDateKey(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+export function todayKey() { return localDateKey(new Date()); }
+function dateOffsetKey(offset) {
+  const date = new Date();
+  date.setHours(12, 0, 0, 0);
+  date.setDate(date.getDate() + offset);
+  return localDateKey(date);
+}
+export function formatDateLabel(key, includeYear = false) {
+  const [year, month, day] = key.split('-').map(Number);
+  const date = new Date(year, month - 1, day, 12);
+  return new Intl.DateTimeFormat(undefined, { month: 'long', day: 'numeric', ...(includeYear ? { year: 'numeric' } : {}) }).format(date);
+}
 export function summarizeWeakFacts(skills) {
   return Object.entries(skills || {}).flatMap(([subject, skill]) => Object.entries(skill.misses || {}).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([key]) => `${subject}: ${key}`));
 }
