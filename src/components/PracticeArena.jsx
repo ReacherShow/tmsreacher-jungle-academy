@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { awardGuidedExpedition } from '../data/profile.js';
 import {
   createProblem,
   getLearningStrategies,
@@ -41,6 +42,7 @@ export default function PracticeArena({ profile, setProfile }) {
   const [showReflection, setShowReflection] = useState(false);
   const [sessionWins, setSessionWins] = useState(0);
   const challengeRef = useRef(null);
+  const expeditionAwardedRef = useRef(false);
 
   const skill = profile.skills?.[subject] || { level: 1, total: 0, correct: 0, reviewQueue: [] };
   const range = getSubjectRange(subject, skill);
@@ -49,6 +51,13 @@ export default function PracticeArena({ profile, setProfile }) {
   const isTeachStep = mode === 'guided' && sessionWins === 8;
   const isComplete = mode === 'guided' && sessionWins >= 10;
   const application = useMemo(() => makeApplicationChallenge(problem), [problem]);
+
+  useEffect(() => {
+    if (!isComplete || expeditionAwardedRef.current) return;
+    expeditionAwardedRef.current = true;
+    setProfile((current) => awardGuidedExpedition(current));
+    setMessage('Expedition complete. The world vine grew one step toward Crystal Forest.');
+  }, [isComplete, setProfile]);
 
   useEffect(() => {
     loadProblem(createProblem(profile, subject, false));
@@ -184,6 +193,7 @@ export default function PracticeArena({ profile, setProfile }) {
   }
 
   function restartExpedition() {
+    expeditionAwardedRef.current = false;
     setSessionWins(0);
     setReviewMode(false);
     nextProblem(profile, false);
@@ -205,7 +215,7 @@ export default function PracticeArena({ profile, setProfile }) {
           <h2>{reviewMode ? 'Review Vine Loop' : mode === 'guided' ? 'Guided Expedition' : 'Practice Arena'}</h2>
         </div>
         <div className="toggle-group">
-          <button className={mode === 'guided' ? 'active' : ''} onClick={() => { setMode('guided'); setSessionWins(0); }}>Guided</button>
+          <button className={mode === 'guided' ? 'active' : ''} onClick={() => { expeditionAwardedRef.current = false; setMode('guided'); setSessionWins(0); }}>Guided</button>
           <button className={mode === 'relaxed' ? 'active' : ''} onClick={() => setMode('relaxed')}>Free practice</button>
           <button className={mode === 'timed' ? 'active' : ''} onClick={() => { setMode('timed'); setTimeLeft(90); }}>Timed</button>
         </div>
