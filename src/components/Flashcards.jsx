@@ -14,7 +14,8 @@ export default function Flashcards({ profile, setProfile }) {
   const [card, setCard] = useState(() => createProblem(profile, 'multiplication'));
   const [flipped, setFlipped] = useState(false);
   const [guess, setGuess] = useState('');
-  const [message, setMessage] = useState('Flashcards are quick reps. Flip, answer, and mark how it felt.');
+  const [message, setMessage] = useState('Flashcards are quick reps. Flip, answer, and notice what your brain remembers.');
+  const [feedback, setFeedback] = useState(null);
   const hint = getHint(card);
 
   function changeDeck(nextDeck) {
@@ -22,25 +23,34 @@ export default function Flashcards({ profile, setProfile }) {
     setCard(createProblem(profile, nextDeck));
     setFlipped(false);
     setGuess('');
+    setFeedback(null);
   }
 
   function next(nextProfile = profile) {
     setCard(createProblem(nextProfile, deck));
     setFlipped(false);
     setGuess('');
+    setFeedback(null);
   }
 
   function mark(correct) {
+    if (feedback) return;
     const nextProfile = updateProfile(profile, card, correct, 'flashcards');
     setProfile(nextProfile);
-    setMessage(correct ? 'Nice rep. The card goes deeper into memory.' : 'Marked for review. No shame, just another vine to climb.');
-    next(nextProfile);
+    setFlipped(true);
+    setFeedback({
+      correct,
+      title: correct ? 'Solved!' : 'Review added',
+      detail: correct ? '+8 XP · +4 Shiny Rocks' : `Answer: ${card.answer} · This card will return`
+    });
+    setMessage(correct ? 'That fact is moving deeper into memory.' : 'No penalty spiral. Study the strategy, then meet the card again.');
+    window.setTimeout(() => next(nextProfile), 1450);
   }
 
-  function submit(e) {
-    e.preventDefault();
-    const correct = isCorrectAnswer(guess, card);
-    mark(correct);
+  function submit(event) {
+    event.preventDefault();
+    if (!guess.trim()) return;
+    mark(isCorrectAnswer(guess, card));
   }
 
   return (
@@ -55,25 +65,31 @@ export default function Flashcards({ profile, setProfile }) {
         </div>
       </div>
       <div className="flashcard-grid">
-        <button className={`flashcard ${flipped ? 'flipped' : ''}`} onClick={() => setFlipped(!flipped)}>
+        <button className={`flashcard ${flipped ? 'flipped' : ''} ${feedback?.correct ? 'card-correct' : ''} ${feedback && !feedback.correct ? 'card-review' : ''}`} onClick={() => !feedback && setFlipped(!flipped)}>
           <span>{flipped ? card.answer : card.display}</span>
-          <small>{flipped ? 'Tap for question' : 'Tap to flip'}</small>
+          <small>{feedback ? 'Next card loading…' : flipped ? 'Tap for question' : 'Tap to flip'}</small>
+          {feedback && (
+            <div className={`flash-feedback ${feedback.correct ? 'success' : 'review'}`} role="status">
+              <strong>{feedback.correct ? '✓' : '↻'} {feedback.title}</strong>
+              <span>{feedback.detail}</span>
+            </div>
+          )}
         </button>
         <div className="study-panel">
           <form onSubmit={submit} className="answer-form compact">
-            <input value={guess} onChange={(e) => setGuess(e.target.value)} placeholder="Try answer" />
-            <button>Check</button>
+            <input value={guess} onChange={(event) => setGuess(event.target.value)} placeholder="Try answer" disabled={Boolean(feedback)} />
+            <button disabled={Boolean(feedback)}>Check</button>
           </form>
           <div className="button-row tight">
-            <button className="mini-btn" onClick={() => setFlipped(true)}>Show answer</button>
-            <button className="mini-btn" onClick={() => mark(true)}>Got it</button>
-            <button className="mini-btn" onClick={() => mark(false)}>Need review</button>
+            <button className="mini-btn" onClick={() => setFlipped(true)} disabled={Boolean(feedback)}>Show answer</button>
+            <button className="mini-btn" onClick={() => mark(true)} disabled={Boolean(feedback)}>Got it</button>
+            <button className="mini-btn" onClick={() => mark(false)} disabled={Boolean(feedback)}>Need review</button>
           </div>
           <div className="hint-card small-hint">
             <strong>Study tip</strong>
             <p>{hint.tip}</p>
           </div>
-          <p className="message">{message}</p>
+          <p className={`message flash-message ${feedback ? 'highlight' : ''}`} aria-live="polite">{message}</p>
         </div>
       </div>
     </section>
