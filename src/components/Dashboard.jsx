@@ -3,6 +3,14 @@ import { accuracy, formatDateLabel, getHistory, getSubjectRange, subjectAccuracy
 const subjects = ['addition', 'subtraction', 'multiplication', 'fractions', 'decimals'];
 const labels = { addition: 'Addition', subtraction: 'Subtraction', multiplication: 'Multiplication', fractions: 'Fractions', decimals: 'Decimals' };
 
+const dimensionLabels = {
+  recall: 'Recall it',
+  visual: 'Model it',
+  application: 'Apply it',
+  explanation: 'Explain it',
+  retention: 'Remember later'
+};
+
 export default function Dashboard({ profile }) {
   const weakFacts = profile.weakFacts?.length ? profile.weakFacts : ['Play a round to discover focus facts'];
   const weekly = getHistory(profile, 7);
@@ -48,6 +56,23 @@ export default function Dashboard({ profile }) {
       </div>
 
       <div className="progress-section">
+        <h3>Mastery is more than one score</h3>
+        <p className="subtle">The app now tracks whether a learner can recall, model, apply, explain, and remember a skill after time away.</p>
+        <div className="mastery-dimensions">
+          {Object.entries(dimensionLabels).map(([key, label]) => {
+            const value = subjects.reduce((sum, subject) => sum + (profile.skills?.[subject]?.masteryDimensions?.[key] || 0), 0);
+            return (
+              <article key={key}>
+                <strong>{label}</strong>
+                <div className="progress-bar"><i style={{ width: `${Math.min(100, value * 8)}%` }} /></div>
+                <small>{value} successful evidence point{value === 1 ? '' : 's'}</small>
+              </article>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="progress-section">
         <h3>Week View</h3>
         <div className="history-bars">
           {weekly.map((day) => (
@@ -62,7 +87,7 @@ export default function Dashboard({ profile }) {
 
       <div className="focus-box">
         <h3>Focus facts and review queue</h3>
-        <p>The app flexes down when recent accuracy drops and flexes up when confidence grows. Dates use the player device’s local timezone, not the server clock.</p>
+        <p>The app flexes down when recent accuracy drops and flexes up when confidence grows. Skipped skills return with support, and long-term review is tracked separately from same-day recall. Dates use the player device’s local timezone.</p>
         <div className="chips">
           {weakFacts.map((fact) => <span key={fact}>{fact}</span>)}
         </div>
