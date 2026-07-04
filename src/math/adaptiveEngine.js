@@ -29,7 +29,15 @@ export function defaultSkill() {
     misses: {},
     reviewQueue: [],
     reviewSchedule: {},
-    lastFive: []
+    lastFive: [],
+    skips: 0,
+    masteryDimensions: {
+      recall: 0,
+      visual: 0,
+      application: 0,
+      explanation: 0,
+      retention: 0
+    }
   };
 }
 
@@ -156,6 +164,15 @@ export function updateProfile(profile, problem, wasCorrect, mode = 'practice') {
     }
   };
 
+  const dimensions = { ...defaultSkill().masteryDimensions, ...(oldSkill.masteryDimensions || {}) };
+  if (wasCorrect) {
+    if (mode === 'guided-retry') dimensions.visual += 1;
+    else if (mode === 'application') dimensions.application += 1;
+    else if (mode === 'teach-purple') dimensions.explanation += 1;
+    else if (mode === 'review') dimensions.retention += 1;
+    else dimensions.recall += 1;
+  }
+
   skills[problem.subject] = {
     ...oldSkill,
     level,
@@ -166,7 +183,8 @@ export function updateProfile(profile, problem, wasCorrect, mode = 'practice') {
     misses: { ...oldSkill.misses, [problem.key]: wasCorrect ? Math.max(0, missCount - 1) : missCount + 1 },
     reviewQueue,
     reviewSchedule,
-    lastFive
+    lastFive,
+    masteryDimensions: dimensions
   };
 
   const daily = { ...(profile.daily || {}) };
@@ -213,6 +231,37 @@ export function updateProfile(profile, problem, wasCorrect, mode = 'practice') {
   };
 }
 
+export function recordSkip(profile, problem) {
+  const today = todayKey();
+  const skills = { ...(profile.skills || {}) };
+  const oldSkill = { ...defaultSkill(), ...(skills[problem.subject] || {}) };
+  const reviewQueue = [...new Set([problem.key, ...(oldSkill.reviewQueue || [])])].slice(0, 18);
+  const reviewSchedule = {
+    ...(oldSkill.reviewSchedule || {}),
+    [problem.key]: {
+      stage: 0,
+      due: today,
+      lastResult: 'skipped',
+      lastSeen: new Date().toISOString()
+    }
+  };
+  skills[problem.subject] = {
+    ...oldSkill,
+    skips: (oldSkill.skips || 0) + 1,
+    reviewQueue,
+    reviewSchedule
+  };
+  const activityLog = [...(profile.activityLog || []), {
+    date: new Date().toISOString(),
+    localDate: today,
+    subject: problem.subject,
+    key: problem.key,
+    correct: false,
+    mode: 'skip'
+  }].slice(-1000);
+  return { ...profile, skills, activityLog };
+}
+
 export function recordStrategyPreference(profile, strategyId) {
   const strategyPreferences = { ...(profile.strategyPreferences || {}) };
   strategyPreferences[strategyId] = (strategyPreferences[strategyId] || 0) + 1;
@@ -255,45 +304,87 @@ function multiplicationStrategies(problem) {
   const smaller = Math.min(a, b);
   const larger = Math.max(a, b);
   const answer = problem.answer;
-  let mentalTip = `Think of ${a} × ${b} as ${a} equal groups of ${b}.`;
-  if (smaller === 9) mentalTip = `Use 10 groups, then remove one: ${larger} × 10 = ${larger * 10}; ${larger * 10} − ${larger} = ${answer}.`;
-  else if (smaller === 8) mentalTip = `Double three times: ${larger} → ${larger * 2} → ${larger * 4} → ${answer}.`;
-  else if (smaller === 6) mentalTip = `Use 5 groups plus one more: ${larger * 5} + ${larger} = ${answer}.`;
-  else if (smaller === 4) mentalTip = `Double twice: ${larger} → ${larger * 2} → ${answer}.`;
-
-  const split = b > 5 ? 5 : Math.max(1, b - 1);
-  const remainder = b - split;
   const sequence = Array.from({ length: a }, (_, i) => b * (i + 1));
+
+  let friendlyBase = 5;
+  let friendlyAction = 'add';
+  if (a >= 8) {
+    friendlyBase = 10;
+    friendlyAction = 'subtract';
+  } else if (a < 5) {
+    friendlyBase = Math.max(2, a - 1);
+    friendlyAction = 'add';
+  }
+  const difference = Math.abs(a - friendlyBase);
+  const friendlyTotal = friendlyBase * b;
+  const adjustment = difference * b;
+
+  let mentalTip = `Picture ${a} equal groups with ${b} in every group.`;
+  if (smaller === 9) mentalTip = `Use 10 groups, then take away one group of ${larger}.`;
+  else if (smaller === 8) mentalTip = `Double ${larger}, double again, then double one more time.`;
+  else if (smaller === 6) mentalTip = `Find 5 groups of ${larger}, then add one more group.`;
+  else if (smaller === 4) mentalTip = `Double ${larger}, then double the result.`;
+  else if (smaller === 5) mentalTip = `Count by fives. Every answer ends in 0 or 5.`;
+  else if (smaller === 2) mentalTip = `Multiplying by 2 means doubling.`;
 
   return [
     {
       id: 'picture-groups',
-      label: 'See groups',
-      tip: `${a} rows with ${b} in each row make ${answer} altogether.`,
+      label: 'Build equal groups',
+      icon: '🧺',
+      cpa: 'Concrete',
+      tip: `Make ${a} groups. Put ${b} counters in every group, then count the total.`,
       model: 'groups',
       groups: Array.from({ length: a }, (_, i) => ({ id: i, count: b }))
     },
     {
-      id: 'break-apart',
-      label: 'Break it apart',
-      tip: remainder > 0
-        ? `${a} × ${b} = (${a} × ${split}) + (${a} × ${remainder}) = ${a * split} + ${a * remainder} = ${answer}.`
-        : mentalTip,
-      model: 'equation',
-      equation: remainder > 0 ? [`${a} × ${b}`, `${a} × ${split} + ${a} × ${remainder}`, `${a * split} + ${a * remainder}`, `${answer}`] : [`${a} × ${b}`, `${answer}`]
-    },
-    {
-      id: 'skip-count',
-      label: 'Skip count',
-      tip: `Count by ${b} exactly ${a} times. The last landing spot is ${answer}.`,
-      model: 'skip-count',
+      id: 'number-line-jumps',
+      label: 'Jump the number line',
+      icon: '🦍',
+      cpa: 'Pictorial',
+      tip: `Start at 0. Make ${a} equal jumps of ${b}. Your last landing spot is the product.`,
+      model: 'repeated-jumps',
+      start: 0,
+      step: b,
+      jumps: a,
       sequence
     },
     {
+      id: 'array-grid',
+      label: 'See the array',
+      icon: '▦',
+      cpa: 'Pictorial',
+      tip: `${a} rows with ${b} squares in each row show the multiplication fact as one rectangle.`,
+      model: 'array-grid',
+      rows: a,
+      cols: b,
+      patternFactor: [2, 5, 10].includes(smaller) ? smaller : null
+    },
+    {
+      id: 'friendly-fact',
+      label: friendlyBase === 5 ? 'Start with 5 groups' : friendlyBase === 10 ? 'Start with 10 groups' : 'Start with an easier group',
+      icon: '🌿',
+      cpa: 'Concrete → Abstract',
+      tip: friendlyAction === 'subtract'
+        ? `Build ${friendlyBase} groups first, then remove ${difference} group${difference === 1 ? '' : 's'}.`
+        : `Build ${friendlyBase} groups first, then add ${difference} more group${difference === 1 ? '' : 's'}.`,
+      model: 'friendly-fact',
+      groups: a,
+      groupSize: b,
+      baseGroups: friendlyBase,
+      difference,
+      action: friendlyAction,
+      friendlyTotal,
+      adjustment,
+      answer
+    },
+    {
       id: 'mental-shortcut',
-      label: 'Mental shortcut',
+      label: 'Monke mental move',
+      icon: '💡',
+      cpa: 'Abstract',
       tip: mentalTip,
-      model: 'equation',
+      model: 'mental-move',
       equation: [`${a} × ${b}`, `${answer}`]
     }
   ];
