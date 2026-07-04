@@ -1,6 +1,6 @@
 {
   "name": "tmsreacher-jungle-academy",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -13,6 +13,7 @@
     "lucide-react": "^0.468.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-    "vite": "7.3.6"
+    "vite": "7.3.6",
+    "firebase": "12.15.0"
   }
 }

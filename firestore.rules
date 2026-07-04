@@ -1,0 +1,76 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function verifiedParent() {
+      return signedIn() && request.auth.token.email_verified == true;
+    }
+
+    function ownsHousehold(householdId) {
+      return signedIn() && request.auth.uid == householdId;
+    }
+
+    function adminPath() {
+      return /databases/$(database)/documents/admins/$(request.auth.uid);
+    }
+
+    function isAdmin() {
+      return signedIn() && exists(adminPath()) && get(adminPath()).data.active == true;
+    }
+
+    match /admins/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    match /invites/{code} {
+      allow get: if verifiedParent();
+      allow list: if isAdmin();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (
+        verifiedParent()
+        && resource.data.active == true
+        && resource.data.usedBy == null
+        && request.time < resource.data.expiresAt
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['active', 'usedBy', 'usedAt'])
+        && request.resource.data.active == false
+        && request.resource.data.usedBy == request.auth.uid
+        && request.resource.data.usedAt == request.time
+      );
+    }
+
+    match /households/{householdId} {
+      allow create: if ownsHousehold(householdId)
+        && verifiedParent()
+        && request.resource.data.ownerUid == householdId
+        && request.resource.data.parentEmail == request.auth.token.email
+        && request.resource.data.inviteCode is string
+        && getAfter(/databases/$(database)/documents/invites/$(request.resource.data.inviteCode)).data.usedBy == householdId;
+
+      allow read, update, delete: if ownsHousehold(householdId);
+
+      match /profiles/{profileId} {
+        allow read, delete: if ownsHousehold(householdId);
+        allow create, update: if ownsHousehold(householdId)
+          && request.resource.data.nickname is string
+          && request.resource.data.nickname.size() > 0
+          && request.resource.data.nickname.size() <= 24
+          && request.resource.data.role in ['child', 'adult']
+          && request.resource.data.monkeStyle is string
+          && request.resource.data.gameState is map;
+      }
+
+      match /feedback/{feedbackId} {
+        allow create: if ownsHousehold(householdId)
+          && request.resource.data.message is string
+          && request.resource.data.message.size() > 0
+          && request.resource.data.message.size() <= 4000
+          && request.resource.data.status == 'new';
+        allow read, update, delete: if ownsHousehold(householdId) || isAdmin();
+      }
+    }
+  }
+}
