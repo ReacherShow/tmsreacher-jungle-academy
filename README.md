@@ -1,54 +1,40 @@
-# TMS REACHER: Jungle Academy
+# TMS REACHER: Jungle Academy v1.6
 
-An adaptive jungle adventure where kids build mathematical understanding through play, visual models, retrieval practice, review, and rewards.
+A Netlify-ready React/Vite learning game focused on adaptive, visual, and playful elementary mathematics.
 
-## v1.5 Learning Loop
+## What is new
 
-This build adds:
+- Guided 10-gate expedition: warm up, learn, practice, apply, Teach Purple, and finish
+- Correct/incorrect feedback replaces the question in place, so the next action is immediately visible
+- Skip-for-now flow that schedules the skill for supported review
+- Concrete–Pictorial–Abstract learning strip
+- Interactive equal-group counters
+- Repeated-jump number line
+- Dynamic arrays and 10 × 10 multiplication-pattern grids
+- Friendlier “start with 5/10 groups” model instead of a dense break-apart equation
+- Application story challenges
+- Teach Purple explanation challenges
+- Mastery tracking across recall, visual modeling, application, explanation, and retention
+- Redesigned avatar shop with categories, item tiles, a live preview, and a clear buy/equip action
+- Curriculum review plan at `docs/CURRICULUM-REVIEW.md`
 
-- Four visually distinct Purple bandanas with increasing Shiny Rock prices
-- Cosmetic equipment slots so Purple's bandana and Monke's gear can appear together
-- A smaller full-body Purple who still walks, jumps, spins, and waves
-- Large green check and red X answer feedback
-- The complete equation after both correct and incorrect attempts
-- Guided correction: study a strategy, then retry the same problem
-- Multiple learning strategies for each problem type
-- Interactive multiplication rows, skip-count paths, and break-apart equations
-- A short metacognitive reflection asking which strategy helped
-- Spaced review dates that bring facts back over increasing intervals
-- A 10-gate daily mission progress track
-- Updated Vite dependency with a clean production build and zero high-severity audit findings at verification time
-
-## Local development
+## Run locally
 
 ```bash
 npm install
 npm run dev
 ```
 
-## Production build
+## Build
 
 ```bash
 npm run build
 ```
 
-## Netlify
+Netlify settings:
 
-- Base directory: leave blank
 - Build command: `npm run build`
 - Publish directory: `dist`
+- Base directory: leave blank
 
-Upload the project contents to the GitHub repository root. Do not upload `node_modules`, `dist`, or the ZIP file.
-
-## Product direction
-
-The game should teach through a cycle of:
-
-1. Retrieve an answer.
-2. Receive unmistakable feedback.
-3. See and manipulate a useful representation.
-4. Retry the same idea.
-5. Reflect on which strategy helped.
-6. Meet the skill again later through spaced review.
-
-See `docs/LEARNING-DESIGN.md` and `docs/SECURITY-PRIVACY-PLAN.md`.
+Do not upload `node_modules`, `dist`, or a package lock generated through a private package registry.
