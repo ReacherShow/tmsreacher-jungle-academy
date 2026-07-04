@@ -1,22 +1,23 @@
-# 🦍 TMS REACHER: Jungle Academy
+# TMS REACHER: Jungle Academy
 
-A Netlify-ready React + Vite PWA game foundation for Monke's adaptive math adventure.
+An adaptive jungle adventure where kids build mathematical understanding through play, visual models, retrieval practice, review, and rewards.
 
-## Included
+## v1.5 Learning Loop
 
-- TMS REACHER purple brand styling
-- PWA home screen icon and manifest
-- YouTube link to https://youtube.com/@tmsreacher
-- Monke as the purple mascot
-- Tiny purple dog companion
-- Waterfall Treehouse home base
-- Practice arena for addition, subtraction, multiplication, fractions, and decimals
-- Adaptive difficulty that flexes up/down by subject
-- Flashcards for fast fact review
-- Visual tools: groups, bars, number lines, fraction models, decimal grids
-- Mental math hints and review queues
-- Shiny Rocks, bananas, XP, energy, and daily streak rewards
-- Parent dashboard with week/month/year progress stored locally
+This build adds:
+
+- Four visually distinct Purple bandanas with increasing Shiny Rock prices
+- Cosmetic equipment slots so Purple's bandana and Monke's gear can appear together
+- A smaller full-body Purple who still walks, jumps, spins, and waves
+- Large green check and red X answer feedback
+- The complete equation after both correct and incorrect attempts
+- Guided correction: study a strategy, then retry the same problem
+- Multiple learning strategies for each problem type
+- Interactive multiplication rows, skip-count paths, and break-apart equations
+- A short metacognitive reflection asking which strategy helped
+- Spaced review dates that bring facts back over increasing intervals
+- A 10-gate daily mission progress track
+- Updated Vite dependency with a clean production build and zero high-severity audit findings at verification time
 
 ## Local development
 
@@ -25,19 +26,29 @@ npm install
 npm run dev
 ```
 
+## Production build
+
+```bash
+npm run build
+```
+
 ## Netlify
 
-Build command: `npm run build`
-Publish directory: `dist`
+- Base directory: leave blank
+- Build command: `npm run build`
+- Publish directory: `dist`
 
-Do not commit `node_modules`, `dist`, or `package-lock.json` from a generated environment.
+Upload the project contents to the GitHub repository root. Do not upload `node_modules`, `dist`, or the ZIP file.
 
-## v1.4 foundation changes
+## Product direction
 
-- Living Waterfall Treehouse background and world navigation signs.
-- Full-body Purple dog with floppy ears, walking, jumping, spinning, waving, and a visible equipped bandana.
-- Clear flashcard success/review feedback before the next card appears.
-- Local-device date keys and written date labels.
-- Banana snacks no longer disappear when energy is already full.
-- Parent gate added before opening the external TMS REACHER YouTube channel.
-- Child privacy and security engineering plan in `docs/SECURITY-PRIVACY-PLAN.md`.
+The game should teach through a cycle of:
+
+1. Retrieve an answer.
+2. Receive unmistakable feedback.
+3. See and manipulate a useful representation.
+4. Retry the same idea.
+5. Reflect on which strategy helped.
+6. Meet the skill again later through spaced review.
+
+See `docs/LEARNING-DESIGN.md` and `docs/SECURITY-PRIVACY-PLAN.md`.
