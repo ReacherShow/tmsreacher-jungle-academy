@@ -161,8 +161,8 @@ export default function App() {
       <WorldMap profile={profile} cosmetics={cosmetics} buyItem={buyItem} shopMessage={shopMessage} useBanana={useBanana} />
       <Dashboard profile={profile} />
       <section className="panel footer-panel">
-        <h2>Season 1 Learning Loop</h2>
-        <p>This build adds visible feedback, guided retries, strategy choice, metacognitive reflection, spaced review scheduling, smaller Purple, and tiered bandanas.</p>
+        <h2>Season 1 Guided Expedition</h2>
+        <p>This build adds a guided expedition, concrete–pictorial–abstract math tools, application challenges, Teach Purple, mastery across time, skipping with scheduled review, and a cleaner avatar shop.</p>
         <button className="ghost-btn" onClick={resetProgress}>Reset local progress</button>
       </section>
     </main>
