@@ -26,6 +26,12 @@ const defaultProfile = {
   weakFacts: [],
   ownedCosmetics: [],
   equippedCosmetic: null,
+  equippedCosmetics: {
+    monkeHead: null,
+    monkeBack: null,
+    dogNeck: null
+  },
+  strategyPreferences: {},
   daily: {},
   activityLog: [],
   settings: {
@@ -36,9 +42,22 @@ const defaultProfile = {
   skills: Object.fromEntries(subjects.map((subject) => [subject, defaultSkill()]))
 };
 
+function legacySlot(itemId) {
+  return cosmetics.find((item) => item.id === itemId)?.slot || null;
+}
+
 function mergeProfile(saved) {
   const merged = { ...defaultProfile, ...(saved || {}) };
   merged.settings = { ...defaultProfile.settings, ...(saved?.settings || {}) };
+  merged.equippedCosmetics = { ...defaultProfile.equippedCosmetics, ...(saved?.equippedCosmetics || {}) };
+  merged.strategyPreferences = { ...defaultProfile.strategyPreferences, ...(saved?.strategyPreferences || {}) };
+
+  // Migrate older saves that had only one equipped item.
+  if (saved?.equippedCosmetic) {
+    const slot = legacySlot(saved.equippedCosmetic);
+    if (slot && !merged.equippedCosmetics[slot]) merged.equippedCosmetics[slot] = saved.equippedCosmetic;
+  }
+
   merged.skills = { ...defaultProfile.skills, ...(saved?.skills || {}) };
   subjects.forEach((subject) => {
     merged.skills[subject] = { ...defaultSkill(), ...(merged.skills[subject] || {}) };
@@ -56,7 +75,7 @@ function loadProfile() {
 
 export default function App() {
   const [profile, setProfile] = useState(() => updateLoginStreak(loadProfile()));
-  const [shopMessage, setShopMessage] = useState('Spend Shiny Rocks on cosmetics. Equipped items should appear immediately.');
+  const [shopMessage, setShopMessage] = useState('Spend Shiny Rocks on cosmetics. Bandanas have distinct styles and price tiers.');
   const [dailyMessage, setDailyMessage] = useState('Keep your daily streak alive with one practice round.');
   const [actionMessage, setActionMessage] = useState('');
 
@@ -76,19 +95,26 @@ export default function App() {
   }
 
   function buyItem(item) {
-    if (profile.ownedCosmetics.includes(item.id)) {
-      setProfile({ ...profile, equippedCosmetic: item.id });
-      setShopMessage(`${item.name} equipped. Look at Monke or Purple in the Waterfall Treehouse.`);
+    const slot = item.slot;
+    const isOwned = profile.ownedCosmetics.includes(item.id);
+    const equippedCosmetics = { ...profile.equippedCosmetics, [slot]: item.id };
+
+    if (isOwned) {
+      setProfile({ ...profile, equippedCosmetics, equippedCosmetic: item.id });
+      setShopMessage(`${item.name} equipped. Purple’s outfit updated immediately.`);
       return;
     }
+
     if (profile.shinyRocks < item.cost) {
       setShopMessage(`Need ${item.cost - profile.shinyRocks} more Shiny Rocks for ${item.name}.`);
       return;
     }
+
     setProfile({
       ...profile,
       shinyRocks: profile.shinyRocks - item.cost,
       ownedCosmetics: [...profile.ownedCosmetics, item.id],
+      equippedCosmetics,
       equippedCosmetic: item.id
     });
     setShopMessage(`${item.name} unlocked and equipped. The change is live in the treehouse.`);
@@ -135,8 +161,8 @@ export default function App() {
       <WorldMap profile={profile} cosmetics={cosmetics} buyItem={buyItem} shopMessage={shopMessage} useBanana={useBanana} />
       <Dashboard profile={profile} />
       <section className="panel footer-panel">
-        <h2>Season 1 Foundation</h2>
-        <p>Next: 12-minute guided expeditions, Monke levels and abilities, parent-owned cloud accounts, family challenges, optional tap-to-hear voice, and invite-only friends.</p>
+        <h2>Season 1 Learning Loop</h2>
+        <p>This build adds visible feedback, guided retries, strategy choice, metacognitive reflection, spaced review scheduling, smaller Purple, and tiered bandanas.</p>
         <button className="ghost-btn" onClick={resetProgress}>Reset local progress</button>
       </section>
     </main>
